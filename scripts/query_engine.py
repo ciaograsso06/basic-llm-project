@@ -1,19 +1,26 @@
-from llama_index.core import VectorStoreIndex
+from llama_index.core import StorageContext, VectorStoreIndex
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.schema import Document  
 
-embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-documents = [
-    Document(text="Este é o primeiro documento."),
-    Document(text="Este é o segundo documento, que é diferente do primeiro.")
-]
+INDEX_DIR = "../data/index"
 
-index = VectorStoreIndex.from_documents(
-    documents,
-    embed_model=embed_model
-)
+def query_engine():
+    embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL_NAME)
 
-query_engine = index.as_query_engine()
-response = query_engine.query("Qual documento é sobre diferenças?")
-print(response)
+    storage_context = StorageContext.from_defaults(persist_dir=INDEX_DIR)
+    index = VectorStoreIndex.load_from_storage_context(storage_context, embed_model=embed_model)
+
+    query_engine = index.as_query_engine()
+
+    print("Digite sua pergunta (ou 'sair' para encerrar):")
+    while True:
+        user_query = input("Pergunta: ")
+        if user_query.lower() == "sair":
+            print("Encerrando...")
+            break
+        response = query_engine.query(user_query)
+        print(f"Resposta: {response}")
+
+if __name__ == "__main__":
+    query_engine()
