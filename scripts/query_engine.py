@@ -1,26 +1,35 @@
-from llama_index.core import StorageContext, VectorStoreIndex
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from langchain.chains import RetrievalQA
+from langchain_community.chat_models import ChatOllama
+from langchain.vectorstores import FAISS
+from langchain.prompts import PromptTemplate
 
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-INDEX_DIR = "../data/index"
+VECTORSTORE_PATH = "../data/index"
 
 def query_engine():
-    embed_model = HuggingFaceEmbedding(model_name=EMBEDDING_MODEL_NAME)
+    print("Carregando o vectorstore...")
+    vectorstore = FAISS.load_local(VECTORSTORE_PATH)
+    
+    print("Carregando o modelo de chat...")
+    llm = ChatOllama(model_name="gpt-3.5-turbo", temperature=0)
 
-    storage_context = StorageContext.from_defaults(persist_dir=INDEX_DIR)
-    index = VectorStoreIndex.load_from_storage_context(storage_context, embed_model=embed_model)
+    retriever = vectorstore.as_retriever()
+    chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=retriever,
+        return_source_docuemnts=True
+    )
+    
+    print(f"Realizando consulta: {query}")
+    result = chain({"query": query})
+    print("\nResposta:", result["result"])
 
-    query_engine = index.as_query_engine()
-
-    print("Digite sua pergunta (ou 'sair' para encerrar):")
-    while True:
-        user_query = input("Pergunta: ")
-        if user_query.lower() == "sair":
-            print("Encerrando...")
-            break
-        response = query_engine.query(user_query)
-        print(f"Resposta: {response}")
-
+    print("\nFontes:")
+    for doc in result["source_documents"]:
+        print(f"- Página: {doc.metadata.get('page', 'desconhecida')}")
+        print(f"Conteúdo: {doc.page_content[:200]}...\n")
+        
 if __name__ == "__main__":
-    query_engine()
+    query= "Como monitorar o status de um host no Zabbix?"
+    query_engine(query)
